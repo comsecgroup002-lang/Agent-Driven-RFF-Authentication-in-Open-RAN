@@ -1,0 +1,208 @@
+# config.yaml
+# RF Fingerprint Open-Set Recognition - V2 完整配置
+# 
+# 注意：Windows 路径请使用以下任一格式：
+#   1. 双反斜杠: "D:\\Lora\\Day1"
+#   2. 正斜杠: "D:/Lora/Day1"
+#   3. 单引号（推荐）: 'D:\Lora\Day1'
+
+seed: 42
+output_dir: outputs
+
+# ============================================================================
+# 路径配置
+# ============================================================================
+paths:
+  # 原始 IQ 数据目录（包含 Device1, Device2, ... 子目录）
+  # 如果 base 中已有数据集，此项可留空
+  raw_data: '/home/wangyb/data/lora/day1'
+
+  # 信号处理后的中间数据（可选，如果 base 已有数据则不需要）
+  processed_data: '/home/wangyb/data/lora/xb_day1_middle'
+
+  # 最终数据集目录（划分后的 train/val/test）
+  base: '/home/wangyb/data/lora/xb_day1_v8'
+
+  # 标签映射文件
+  label_map: 'label2index_3band.json'
+
+  # 模型权重
+  model_weights: 'convnext_cosface_3chv2.pth'
+
+# ============================================================================
+# 数据目录配置 (相对于 paths.base)
+# ============================================================================
+data:
+  low:
+    train: 'cA2/train'
+    val: 'cA2/val'
+    test: '/home/wangyb/data/lora/xb_day2_v3/cA2/test'
+  mid:
+    train: 'cD1/train'
+    val: 'cD1/val'
+    test: '/home/wangyb/data/lora/xb_day2_v3/cD1/test'
+  high:
+    train: 'cD2/train'
+    val: 'cD2/val'
+    test: '/home/wangyb/data/lora/xb_day2_v3/cD2/test'
+# ============================================================================
+# 信号处理配置
+# ============================================================================
+signal_processing:
+  sample_count: 20000000      # 读取的采样点数
+  sample_rate: 1000000.0      # 采样率 (Hz)
+  window_size: 8192           # 窗口大小
+  stride: 8192                # 步长
+  wavelet_type: 'db4'         # 小波类型
+
+  # STFT 参数
+  stft_win_size: 256
+  stft_overlap: 200
+  stft_nfft: 512
+
+  # 输出图像
+  img_dpi: 150
+
+  # 并行处理
+  num_workers: 4
+
+# ============================================================================
+# 信号增强配置（LLM 可调整的参数）
+# ============================================================================
+signal_augment:
+  # ===== Stage 概率参数 =====
+  retain_ratio: 0.5           # 保留原始信号概率 [0.3, 0.7]
+  channel_aug_prob: 1.0       # 信道增强概率 [0.7, 1.0]
+  engineering_aug_prob: 0.7   # 工程扰动概率 [0.4, 0.9]
+  drift_prob: 0.05            # 符号漂移概率 [0.02, 0.15]
+  shift_prob: 0.10            # 时间偏移概率 [0.05, 0.20]
+
+  # ===== 信道参数（严格限制范围）=====
+  tau_rms_min_ns: 20.0        # RMS 延迟扩展最小值 [15, 30]
+  tau_rms_max_ns: 150.0       # RMS 延迟扩展最大值 [100, 200]
+  doppler_min_hz: 0.1         # 多普勒频移最小值 [0.05, 0.2]
+  doppler_max_hz: 5.0         # 多普勒频移最大值 [3.0, 8.0]
+  k_factor_min_db: 3.0        # Rician K 因子最小值 [2.0, 5.0]
+  k_factor_max_db: 10.0       # Rician K 因子最大值 [8.0, 15.0]
+
+  # ===== 工程扰动参数（严格限制范围）=====
+  snr_min_db: 30.0            # 信噪比最小值 [25, 35]
+  snr_max_db: 40.0            # 信噪比最大值 [35, 45]
+  gain_std: 0.05              # 增益标准差 [0.02, 0.08]
+  nonlinear_coef: 0.003       # 非线性系数 [0.001, 0.005]
+  iq_amplitude_std: 0.02      # IQ 幅度不平衡 [0.01, 0.03]
+  iq_phase_std_deg: 1.0       # IQ 相位不平衡 [0.5, 2.0]
+
+  # ===== 漂移参数（严格限制范围）=====
+  max_time_shift: 2           # 最大时间偏移 [1, 4]
+  drift_ppm_min: 300          # 频率漂移最小值 [200, 400]
+  drift_ppm_max: 1000         # 频率漂移最大值 [800, 1200]
+
+# ============================================================================
+# 数据集划分配置
+# ============================================================================
+dataset_split:
+  train_window_start: 1
+  train_window_end: 800
+  test_window_start: 801
+  test_window_end: 900
+  val_window_start: 901
+  val_window_end: 1000
+  num_known_devices: 10       # 已知设备数量（用于 train/test）
+  total_devices: 11           # 总设备数量（val 包含所有）
+  iq_file_start: 1
+  iq_file_end: 5
+
+# ============================================================================
+# 模型配置
+# ============================================================================
+model:
+  backbone: 'convnext_tiny'   # convnext_tiny/small/base
+  img_size: 224
+  channels_last: true
+  # 预训练权重目录（本地路径，不联网下载）
+  pretrained_dir: '/home/wangyb/pretrained_models'
+  cosface_s: 30.0
+  cosface_m: 0.35
+
+# ============================================================================
+# 训练配置
+# ============================================================================
+train:
+  batch_size: 128
+  max_epochs: 60
+  warmup_epochs: 3
+  base_lr: 0.0003
+  min_lr: 0.00001
+  weight_decay: 0.05
+  early_patience: 8
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  use_bf16: true
+
+# ============================================================================
+# 模型级数据增强配置（轻微增强，固定不变）
+# ============================================================================
+augment:
+  enable: true
+  aug_strength: 0.15
+  spec_fmask_p: 0.01
+  spec_tmask_p: 0.01
+  weak_geo_max_angle: 1.0
+  weak_geo_translate: 0.02
+  weak_geo_scale: 0.02
+
+# ============================================================================
+# 开集识别配置
+# ============================================================================
+open_set:
+  energy:
+    alpha_init: 0.6
+    auto_alpha: true
+    alpha_grid: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  calibration:
+    accept_quantile: 0.90
+    margin_quantile: 0.20
+    rho: 0.10
+  mahalanobis:
+    k_centroids: 3
+
+# ============================================================================
+# 阈值搜索配置
+# ============================================================================
+threshold_search:
+  accept_q_grid: [0.70, 0.75, 0.80, 0.85, 0.88, 0.90, 0.92, 0.95, 0.98]
+  margin_q_grid: [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35]
+  rho_grid: [-0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35]
+
+# ============================================================================
+# Agent 配置
+# ============================================================================
+agent:
+  max_rounds: 5
+
+  objectives:
+    min_closed_acc: 0.9
+    target_open_auc: 0.85
+    max_reject_rate: 0.60
+
+  llm:
+    enable: true              # V2 版本默认关闭 LLM
+    model_path: '/home/wangyb/llm_model'
+    device_map: 'auto'
+    dtype: 'fp16'
+    quantization: 'auto'
+    max_new_tokens: 400
+    offline_mode: true
+
+# ============================================================================
+# 云端配置 (V2 新增)
+# ============================================================================
+cloud:
+  enabled: false               # 是否启用云端连接
+  server_url: 'http://localhost:5000'
+  terminal_id: null            # 自动生成
+  auto_report: true            # 自动上报适应记录
+  cache_dir: 'cloud_cache'     # 本地缓存目录
