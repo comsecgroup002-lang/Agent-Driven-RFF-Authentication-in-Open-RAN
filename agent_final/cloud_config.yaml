@@ -1,0 +1,93 @@
+# cloud_config.yaml
+# 云端 Agent V2 配置
+
+# ============================================================================
+# 基础配置
+# ============================================================================
+data_dir: 'cloud_data'          # 数据存储目录
+
+# ★ 协助模式（核心参数）
+# - lightweight: 只提供轻量级阈值区间指导 I_j + 经验摘要
+# - model_reprovision: 只提供完整模型包 M_j
+# - auto: 根据边缘节点状态自动选择
+assistance_mode: 'auto'
+
+# ============================================================================
+# 初始模型配置（用于 model_reprovision 模式启动时没有聚合模型的情况）
+# ============================================================================
+initial_model:
+  weights_path: '/home/wangyb/code/agent_v10/convnext_cosface_3chv2.pth'  # 初始权重路径
+  model_config:
+    backbone: 'convnext_tiny'
+    img_size: 224
+    channels_last: true
+    pretrained_dir: '/home/wangyb/pretrained_models'
+    cosface_s: 30.0
+    cosface_m: 0.35
+  signal_augment:
+    retain_ratio: 0.5
+    channel_aug_prob: 1.0
+    engineering_aug_prob: 0.7
+    drift_prob: 0.05
+    shift_prob: 0.10
+    snr_min_db: 30.0
+    snr_max_db: 40.0
+  baseline_thresholds:
+    - accept_quantile: 0.90
+      margin_quantile: 0.20
+      rho: 0.0
+    - accept_quantile: 0.85
+      margin_quantile: 0.15
+      rho: 0.05
+    - accept_quantile: 0.88
+      margin_quantile: 0.25
+      rho: -0.05
+
+# ============================================================================
+# 先验构建参数
+# ============================================================================
+prior:
+  min_samples: 3                # 构建先验所需最小样本数（降低以便快速生效）
+  confidence_threshold: 0.7     # 置信度阈值
+  interval_expansion: 0.05      # 区间扩展因子
+
+# ============================================================================
+# 经验摘要配置（用于轻量级指导）
+# ============================================================================
+experience_summary:
+  max_recent_episodes: 10       # 用于摘要的最近记录数
+  include_successful_only: false # 是否只包含成功记录
+  include_param_stats: true     # 是否包含参数统计
+
+# ============================================================================
+# 失配检测参数
+# ============================================================================
+mismatch:
+  mild_threshold: 0.05          # 轻度失配：性能下降 5%
+  moderate_threshold: 0.10      # 中度失配：性能下降 10%
+  severe_threshold: 0.20        # 严重失配：性能下降 20%
+  max_consecutive_failures: 3   # 触发模型重配置的连续失败次数
+
+# ============================================================================
+# 模型聚合参数
+# ============================================================================
+aggregation:
+  method: 'weighted_avg'        # fedavg, weighted_avg, best_select
+  min_contributors: 2           # 聚合所需最小贡献者数
+  metric_for_weight: 'open_auc' # 用于加权的性能指标
+
+# ============================================================================
+# 目标（与边缘端保持一致）
+# ============================================================================
+objectives:
+  min_closed_acc: 0.9
+  target_open_auc: 0.85
+  max_reject_rate: 0.60
+
+# ============================================================================
+# 服务器配置
+# ============================================================================
+server:
+  host: '0.0.0.0'
+  port: 5000
+  debug: false
