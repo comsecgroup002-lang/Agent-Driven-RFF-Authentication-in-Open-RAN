@@ -911,8 +911,8 @@ class EdgeAgentV2:
         obj = self.objectives
         feasible = [r for r in pareto if
                     r["metrics"]["closed_acc"] >= obj["min_closed_acc"] and
-                    r["metrics"]["open_auc"] >= obj["target_open_auc"] and
-                    r["metrics"]["reject_rate"] <= obj["max_reject_rate"]]
+                    r["metrics"]["open_auc"] >= obj["target_open_auc"] 
+                    
         if feasible:
             return max(feasible, key=lambda x: x["metrics"]["open_auc"])
         closed_ok = [r for r in pareto if r["metrics"]["closed_acc"] >= obj["min_closed_acc"]]
