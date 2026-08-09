@@ -1,0 +1,167 @@
+
+seed: 42
+output_dir: outputs
+
+
+paths:
+
+  raw_data: '/set/your/path/lora/day1'
+
+  # 信号处理后的中间数据（可选，如果 base 已有数据则不需要）
+  processed_data: '/set/your/path/lora/xb_day1_middle'
+
+  # 最终数据集目录（划分后的 train/val/test）
+  base: '/set/your/path/lora/xb_day1_v8'
+
+  # 标签映射文件
+  label_map: 'label2index_3band.json'
+
+  # 模型权重
+  model_weights: 'convnext.pth'
+
+
+data:
+  low:
+    train: 'cA2/train'
+    val: 'cA2/val'
+    test: '/set/your/path/lora/xb_day2_v3/cA2/test'
+  mid:
+    train: 'cD1/train'
+    val: 'cD1/val'
+    test: '/set/your/path/lora/xb_day2_v3/cD1/test'
+  high:
+    train: 'cD2/train'
+    val: 'cD2/val'
+    test: '/set/your/path/lora/xb_day2_v3/cD2/test'
+
+signal_processing:
+  sample_count: 20000000      # 读取的采样点数
+  sample_rate: 1000000.0      # 采样率 (Hz)
+  window_size: 8192           # 窗口大小
+  stride: 8192                # 步长
+  wavelet_type: 'db4'         # 小波类型
+
+  # STFT 参数
+  stft_win_size: 256
+  stft_overlap: 200
+  stft_nfft: 512
+
+  # 输出图像
+  img_dpi: 150
+
+  # 并行处理
+  num_workers: 4
+
+
+signal_augment:
+  # ===== Stage 概率参数 =====
+  retain_ratio: 0.5           # 保留原始信号概率 [0.3, 0.7]
+  channel_aug_prob: 1.0       # 信道增强概率 [0.7, 1.0]
+  engineering_aug_prob: 0.7   # 工程扰动概率 [0.4, 0.9]
+  drift_prob: 0.05            # 符号漂移概率 [0.02, 0.15]
+  shift_prob: 0.10            # 时间偏移概率 [0.05, 0.20]
+
+  # ===== 信道参数（严格限制范围）=====
+  tau_rms_min_ns: 20.0        # RMS 延迟扩展最小值 [15, 30]
+  tau_rms_max_ns: 150.0       # RMS 延迟扩展最大值 [100, 200]
+  doppler_min_hz: 0.1         # 多普勒频移最小值 [0.05, 0.2]
+  doppler_max_hz: 5.0         # 多普勒频移最大值 [3.0, 8.0]
+  k_factor_min_db: 3.0        # Rician K 因子最小值 [2.0, 5.0]
+  k_factor_max_db: 10.0       # Rician K 因子最大值 [8.0, 15.0]
+
+  # ===== 工程扰动参数（严格限制范围）=====
+  snr_min_db: 30.0            # 信噪比最小值 [25, 35]
+  snr_max_db: 40.0            # 信噪比最大值 [35, 45]
+  gain_std: 0.05              # 增益标准差 [0.02, 0.08]
+  nonlinear_coef: 0.003       # 非线性系数 [0.001, 0.005]
+  iq_amplitude_std: 0.02      # IQ 幅度不平衡 [0.01, 0.03]
+  iq_phase_std_deg: 1.0       # IQ 相位不平衡 [0.5, 2.0]
+
+  # ===== 漂移参数（严格限制范围）=====
+  max_time_shift: 2           # 最大时间偏移 [1, 4]
+  drift_ppm_min: 300          # 频率漂移最小值 [200, 400]
+  drift_ppm_max: 1000         # 频率漂移最大值 [800, 1200]
+
+
+dataset_split:
+  train_window_start: 1
+  train_window_end: 800
+  test_window_start: 801
+  test_window_end: 900
+  val_window_start: 901
+  val_window_end: 1000
+  num_known_devices: 10       # 已知设备数量（用于 train/test）
+  total_devices: 11           # 总设备数量（val 包含所有）
+  iq_file_start: 1
+  iq_file_end: 5
+
+
+model:
+  backbone: 'convnext_tiny'   # convnext_tiny/small/base
+  img_size: 224
+  channels_last: true
+  # 预训练权重目录（本地路径，不联网下载）
+  pretrained_dir: '/home/wangyb/pretrained_models'
+  cosface_s: 30.0
+  cosface_m: 0.35
+
+
+train:
+  batch_size: 128
+  max_epochs: 60
+  warmup_epochs: 3
+  base_lr: 0.0003
+  min_lr: 0.00001
+  weight_decay: 0.05
+  early_patience: 8
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  use_bf16: true
+
+
+augment:
+  enable: true
+  aug_strength: 0.15
+  spec_fmask_p: 0.01
+  spec_tmask_p: 0.01
+  weak_geo_max_angle: 1.0
+  weak_geo_translate: 0.02
+  weak_geo_scale: 0.02
+
+
+open_set:
+  energy:
+    alpha_init: 0.6
+    auto_alpha: true
+    alpha_grid: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  calibration:
+    accept_quantile: 0.90
+    margin_quantile: 0.20
+    rho: 0.10
+  mahalanobis:
+    k_centroids: 3
+
+
+threshold_search:
+  accept_q_grid: [0.70, 0.75, 0.80, 0.85, 0.88, 0.90, 0.92, 0.95, 0.98]
+  margin_q_grid: [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35]
+  rho_grid: [-0.15, -0.10, -0.05, 0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35]
+
+
+agent:
+  max_rounds: 5
+
+  objectives:
+    min_closed_acc: 0.9
+    target_open_auc: 0.85
+    max_reject_rate: 0.60    # Auxiliary service-availability metric; not a hard feasibility constraint
+
+
+cloud:
+  enabled: false               # 是否启用云端连接
+  server_url: 'http://localhost:5000'
+  terminal_id: null            # 自动生成
+  auto_report: true            # 自动上报适应记录
+  cache_dir: 'cloud_cache'     # 本地缓存目录
