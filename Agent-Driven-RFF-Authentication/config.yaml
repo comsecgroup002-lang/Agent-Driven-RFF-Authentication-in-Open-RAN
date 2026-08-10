@@ -1,0 +1,167 @@
+seed: 42
+output_dir: outputs
+
+paths:
+  raw_data: '/set/your/path/lora/day1'
+  processed_data: '/set/your/path/lora/xb_day1_middle'
+  base: '/set/your/path/lora/xb_day1_v8'
+  label_map: 'label2index_3band.json'
+  model_weights: 'convnext.pth'
+
+# Source-domain train/validation data are under paths.base. The test entries may
+# point to a fully held-out target domain for cross-domain evaluation.
+data:
+  low:
+    train: 'cA2/train'
+    val: 'cA2/val'
+    test: '/set/your/path/lora/xb_day2_v3/cA2/test'
+  mid:
+    train: 'cD1/train'
+    val: 'cD1/val'
+    test: '/set/your/path/lora/xb_day2_v3/cD1/test'
+  high:
+    train: 'cD2/train'
+    val: 'cD2/val'
+    test: '/set/your/path/lora/xb_day2_v3/cD2/test'
+
+signal_processing:
+  sample_count: 20000000
+  sample_rate: 1000000.0
+  window_size: 8192
+  stride: 8192
+  wavelet_type: 'db4'
+  stft_win_size: 256
+  stft_overlap: 200
+  stft_nfft: 512
+  img_dpi: 150
+  num_workers: 4
+
+# Fixed preprocessing/training configuration. These parameters are NOT in the
+# LLM/Policy-Guard action space in the revised framework.
+signal_augment:
+  retain_ratio: 0.5
+  channel_aug_prob: 1.0
+  engineering_aug_prob: 0.7
+  drift_prob: 0.05
+  shift_prob: 0.10
+  tau_rms_min_ns: 20.0
+  tau_rms_max_ns: 150.0
+  doppler_min_hz: 0.1
+  doppler_max_hz: 5.0
+  k_factor_min_db: 3.0
+  k_factor_max_db: 10.0
+  snr_min_db: 30.0
+  snr_max_db: 40.0
+  gain_std: 0.05
+  nonlinear_coef: 0.003
+  iq_amplitude_std: 0.02
+  iq_phase_std_deg: 1.0
+  max_time_shift: 2
+  drift_ppm_min: 300
+  drift_ppm_max: 1000
+
+# 8:1:1 non-overlapping temporal blocks in the source domain. Train and
+# validation contain the 10 enrolled devices only. The 11th device is included
+# exclusively in the open-set test split.
+dataset_split:
+  train_window_start: 1
+  train_window_end: 800
+  val_window_start: 901
+  val_window_end: 1000
+  test_window_start: 801
+  test_window_end: 900
+  num_known_devices: 10
+  total_devices: 11
+  iq_file_start: 1
+  iq_file_end: 10
+
+model:
+  backbone: 'convnext_tiny'
+  img_size: 224
+  channels_last: true
+  pretrained_dir: '/set/your/path/pretrained_models'
+  cosface_s: 30.0
+  cosface_m: 0.35
+
+train:
+  batch_size: 128
+  max_epochs: 60
+  warmup_epochs: 3
+  base_lr: 0.0003
+  min_lr: 0.00001
+  weight_decay: 0.05
+  early_patience: 8
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  use_bf16: true
+
+augment:
+  enable: true
+  aug_strength: 0.15
+  spec_fmask_p: 0.01
+  spec_tmask_p: 0.01
+  weak_geo_max_angle: 1.0
+  weak_geo_translate: 0.02
+  weak_geo_scale: 0.02
+
+open_set:
+  energy:
+    alpha_init: 0.6
+    auto_alpha: true
+    alpha_grid: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+  calibration:
+    accept_quantile: 0.90
+    margin_quantile: 0.20
+    delta_fused: 0.10
+    delta_margin: 0.10
+  mahalanobis:
+    k_centroids: 3
+
+# Global safe-set search used by cached-score replay. Cloud guidance may only
+# restrict this set; it cannot enlarge these intervals.
+threshold_search:
+  accept_quantile_grid: [0.80, 0.85, 0.88, 0.90, 0.92, 0.95]
+  margin_quantile_grid: [0.10, 0.15, 0.20, 0.25, 0.30]
+  delta_fused_grid: [-0.15, -0.10, -0.05, 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35]
+  delta_margin_grid: [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35]
+  guidance_radius: 0.05
+  selection:
+    lambda_r: 0.25
+    lambda_o: 1.0
+    lambda_s: 0.20
+
+# The target-domain records are never used for model fitting. During
+# post-deployment control, the held-out target test records are divided into
+# disjoint contiguous control/evaluation buffers so the final reported records
+# do not select the operating point.
+runtime_buffer:
+  control_fraction: 0.50
+  min_samples_per_group: 1
+
+agent:
+  max_rounds: 5
+  objectives:
+    min_closed_acc: 0.90
+    target_open_auc: 0.85
+
+# Rejection rate is retained as an auxiliary service-availability indicator for
+# Pareto filtering/selection; it is not a hard feasibility condition.
+reporting:
+  rejection_rate_reference: 0.60
+
+fallback:
+  max_step: 0.03
+  neutral_search_state:
+    accept_quantile: 0.90
+    margin_quantile: 0.20
+    delta_fused: 0.10
+    delta_margin: 0.10
+
+cloud:
+  enabled: false
+  server_url: 'http://localhost:5000'
+  terminal_id: null
+  timeout_seconds: 15
+  guidance_strategy: 'rag'   # rag | llm_only | deterministic

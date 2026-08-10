@@ -1,0 +1,62 @@
+data_dir: 'cloud_data'
+assistance_mode: 'auto'   # lightweight | model_reprovision | auto
+
+# The RAG-enabled LLM advisor is cloud-side only.
+llm:
+  enable: true
+  model_path: '/set/your/path/llm_model'
+  device_map: 'auto'
+  dtype: 'fp16'
+  quantization: 'auto'
+  max_new_tokens: 400
+  offline_mode: true
+
+rag:
+  k_success: 3
+  k_failure: 2
+
+# Set read_only=true when reproducing the four-arm guidance ablation so every
+# arm queries exactly the same historical-case snapshot.
+experience_bank:
+  read_only: false
+
+# Empirical priors can restrict, but never enlarge, the global safe set.
+prior:
+  min_samples: 3
+  interval_expansion: 0.05
+
+# AUTO mode uses source-model reprovisioning only after lightweight guidance
+# remains infeasible. No cross-edge model aggregation is performed.
+initial_model:
+  weights_path: '/set/your/path/convnext.pth'
+  model_config:
+    backbone: 'convnext_tiny'
+    img_size: 224
+    channels_last: true
+    pretrained_dir: '/set/your/path/pretrained_models'
+    cosface_s: 30.0
+    cosface_m: 0.35
+  baseline_thresholds:
+    - accept_quantile: 0.90
+      margin_quantile: 0.20
+      delta_fused: 0.10
+      delta_margin: 0.10
+
+mismatch:
+  max_consecutive_failures: 3
+
+objectives:
+  min_closed_acc: 0.90
+  target_open_auc: 0.85
+
+# PolicyGuard.SAFE_RANGES and MAX_STEP are defined in code from the same
+# allowlist used by llm_advisor.py:
+# accept_quantile [0.80,0.95], margin_quantile [0.10,0.30],
+# delta_fused [-0.15,0.35], delta_margin [0.05,0.35], all max-step 0.05.
+audit:
+  policy_guard_log: 'policy_guard_events.jsonl'
+
+server:
+  host: '0.0.0.0'
+  port: 5000
+  debug: false
