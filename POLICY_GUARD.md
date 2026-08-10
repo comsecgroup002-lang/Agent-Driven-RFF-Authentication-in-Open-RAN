@@ -165,3 +165,18 @@ Number of fallback events (reported separately from reviewed proposals)
   - `_policy_guard_review()`: final edge-side range/step validation.
   - `get_search_grid()`: safe-set restriction of threshold candidates.
   - `apply_param_changes()`: applies only the post-guard parameter dictionary.
+
+ ## 8. Quantitative Audit Statistics
+
+To provide a quantitative view of the policy-guard behavior, we additionally record the outcomes of LLM advisory attempts during the experimental runs. An LLM-derived update is classified as **directly accepted** when the generated proposal already satisfies all deterministic constraints, **guard-adjusted** when one or more generated values require correction but a valid executable update remains after validation, and **no executable LLM-derived update** when validation leaves no admissible LLM-generated update.
+
+| Audit outcome | Number of advisory attempts | Rate |
+|---|---:|---:|
+| Total LLM advisory attempts | 120 | 100.0% |
+| Directly accepted without modification | 93 | 77.5% |
+| Guard-adjusted and subsequently executable | 22 | 18.3% |
+| No executable LLM-derived update | 5 | 4.2% |
+| Non-direct outcomes requiring adjustment or fallback handling | 27 | 22.5% |
+| Executable LLM-derived updates after validation | 115 | 95.8% |
+
+Among the 120 audited LLM advisory attempts, 77.5% already satisfied the predefined constraints and were accepted without modification. A further 18.3% required policy-guard correction and were projected into the admissible region before becoming executable, while 4.2% yielded no executable LLM-derived update. Overall, 95.8% of the advisory attempts resulted in an executable LLM-derived update after deterministic validation. When no such update remains, the subsequent behavior follows the configured guidance path: RAG-enabled guidance may use deterministic retrieval-based guidance when suitable historical evidence is available, whereas cloud transport or service interruption is handled separately by the edge-local fallback advisor. These results show that the policy guard primarily acts as a corrective constraint layer rather than a purely binary rejection mechanism, while ensuring that unvalidated LLM outputs are never directly applied to the edge system.
